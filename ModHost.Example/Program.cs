@@ -67,7 +67,10 @@ public class Program
 				CommandSource source = context.GetSource();
 				await context.SendFeedbackAsync($"Was player: {await source.IsExecutedByPlayer()}");
 				await context.SendFeedbackAsync($"Name: {await source.GetName()}");
-			});
+				await context.SendFeedbackAsync($"Has Permission level 0: {await source.HasPermissionLevel(0)}");
+				await context.SendFeedbackAsync($"Has Permission level 1: {await source.HasPermissionLevel(1)}");
+			},
+			requirement: async context => await context.HasPermissionLevel(1));
 		
 		Console.WriteLine("ModHost ready and connected.");
 

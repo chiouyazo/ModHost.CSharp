@@ -6,19 +6,21 @@ public class CommandContext
 	
 	public bool Finalized { get; private set; }
 	public string CommandContextId { get; }
+	public string CommandName { get; }
 	public string Payload { get; }
 
 
-	public CommandContext(ModHostBridge bridge, string commandContextId, string payload)
+	public CommandContext(ModHostBridge bridge, string commandContextId, string commandName, string payload)
 	{
 		_bridge = bridge;
 		CommandContextId = commandContextId;
 		Payload = payload;
+		CommandName = commandName;
 	}
 	
 	public CommandSource GetSource()
 	{
-		return new CommandSource(_bridge, CommandContextId);
+		return new CommandSource(_bridge, CommandContextId, CommandName);
 	}
 	
 	public async Task SendFeedbackAsync(string message)

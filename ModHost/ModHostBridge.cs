@@ -11,7 +11,8 @@ public class ModHostBridge : IDisposable
     private readonly TcpClient _client;
     private readonly Dictionary<string, TaskCompletionSource<string>> _pendingRequests = new();
     
-    private readonly Dictionary<string, Func<CommandContext, Task>> _commandCallbacks = new();
+    private readonly Dictionary<string, Func<CommandContext, Task>> _commandCallbacks = new Dictionary<string, Func<CommandContext, Task>>();
+    private readonly Dictionary<string, Func<CommandSource, Task<bool>>?> _requirementCallbacks = new Dictionary<string, Func<CommandSource, Task<bool>>?>();
     
     public ModHostBridge(int port, string modName)
     {
@@ -49,12 +50,12 @@ public class ModHostBridge : IDisposable
             else
             {
                 // handle unsolicited events here
-                HandleEvent(id, eventType, payload);
+                await Task.Run(() => HandleEvent(id, eventType, payload));
             }
         }
     }
 
-    private void HandleEvent(string id, string eventType, string payload)
+    private async Task HandleEvent(string id, string eventType, string payload)
     {
         if (eventType == "COMMAND_EXECUTED")
         {
@@ -70,7 +71,7 @@ public class ModHostBridge : IDisposable
             
             if (_commandCallbacks.TryGetValue(commandName, out Func<CommandContext, Task>? callback))
             {
-                CommandContext context = new CommandContext(this, id, commandPayload);
+                CommandContext context = new CommandContext(this, id, commandName, commandPayload);
                 _ = callback(context);
             }
         }
@@ -83,8 +84,23 @@ public class ModHostBridge : IDisposable
             
             if (_commandCallbacks.TryGetValue(commandName, out Func<CommandContext, Task>? callback))
             {
-                CommandContext context = new CommandContext(this, id, commandPayload);
+                CommandContext context = new CommandContext(this, id, commandName, commandPayload);
                 _ = callback(context);
+            }
+        }
+        else if (eventType == "COMMAND_REQUIREMENT")
+        {
+            // Example payload: someCommand
+            string[] split = payload.Split(':', 2);
+            string commandName = split[0];
+            string sourcePayload = split.Length > 1 ? split[1] : "";
+
+            if (_requirementCallbacks.TryGetValue(commandName, out Func<CommandSource, Task<bool>>? callback))
+            {
+                CommandSource ctx = new CommandSource(this, id, commandName);
+                bool allowed = callback == null || await callback(ctx);
+
+                await _writer.WriteLineAsync($"{id}:COMMAND_REQUIREMENT_RESPONSE:{allowed}");
             }
         }
         else
@@ -125,27 +141,27 @@ public class ModHostBridge : IDisposable
         await SendRequestAsync(id, "COMMAND_FINALIZE", commandId);
     }
     
-    public async Task RegisterCommandAsync(string commandName, Func<CommandContext, Task> onExecuted)
+    public async Task RegisterCommandAsync(string commandName, Func<CommandContext, Task> onExecuted, Func<CommandSource, Task<bool>>? requirement = null)
     {
         await RegisterManualCommandAsync(commandName, async context =>
         {
             await onExecuted(context);
             if (!context.Finalized)
                 await context.FinalizeAsync();
-        });
+        }, requirement);
     }
     
-    public async Task RegisterCommandAsync(string commandName, List<CommandArgument> arguments, Func<CommandContext, Task> onExecuted)
+    public async Task RegisterCommandAsync(string commandName, List<CommandArgument> arguments, Func<CommandContext, Task> onExecuted, Func<CommandSource, Task<bool>>? requirement = null)
     {
         await RegisterManualCommandAsync(commandName, arguments, async context =>
         {
             await onExecuted(context);
             if (!context.Finalized)
                 await context.FinalizeAsync();
-        });
+        }, requirement);
     }
 
-    public async Task RegisterManualCommandAsync(string commandName, Func<CommandContext, Task> onExecuted)
+    public async Task RegisterManualCommandAsync(string commandName, Func<CommandContext, Task> onExecuted, Func<CommandSource, Task<bool>>? requirement = null)
     {
         string id = Guid.NewGuid().ToString();
         
@@ -155,6 +171,7 @@ public class ModHostBridge : IDisposable
         {
             Console.WriteLine($"Registered command {commandName} successfully from C#.");
             _commandCallbacks.Add(commandName, onExecuted);
+            _requirementCallbacks.Add(commandName, requirement);
         }
         else
         {
@@ -162,7 +179,7 @@ public class ModHostBridge : IDisposable
         }
     }
 
-    public async Task RegisterManualCommandAsync(string commandName, List<CommandArgument> arguments, Func<CommandContext, Task> onExecuted)
+    public async Task RegisterManualCommandAsync(string commandName, List<CommandArgument> arguments, Func<CommandContext, Task> onExecuted, Func<CommandSource, Task<bool>>? requirement = null)
     {
         string id = Guid.NewGuid().ToString();
         
@@ -177,6 +194,7 @@ public class ModHostBridge : IDisposable
         {
             Console.WriteLine($"Registered command '{commandName}' with args successfully from C#.");
             _commandCallbacks.Add(commandName, onExecuted);
+            _requirementCallbacks.Add(commandName, requirement);
         }
         else
         {

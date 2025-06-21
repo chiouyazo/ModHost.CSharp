@@ -136,6 +136,13 @@ public class Program
 					}
 				}
 			});
+
+		await commandHandler.RegisterCommandAsync("day", async context =>
+		{
+			await context.ExecuteMinecraftCommandAsync("time set day");
+			await context.ExecuteMinecraftCommandAsync("weather clear");
+		}, 
+			async context => await context.HasPermissionLevel(1));
 		
 		Console.WriteLine("ModHost ready and connected.");
 

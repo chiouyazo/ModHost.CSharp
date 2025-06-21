@@ -3,16 +3,18 @@
 public class CommandContext
 {
 	private readonly ModHostBridge _bridge;
-	
+	private readonly string _platform;
+
 	public bool Finalized { get; private set; }
 	public string CommandContextId { get; }
 	public string CommandName { get; }
 	public string Payload { get; }
 
 
-	public CommandContext(ModHostBridge bridge, string commandContextId, string commandName, string payload)
+	public CommandContext(ModHostBridge bridge, string commandContextId, string platform, string commandName, string payload)
 	{
 		_bridge = bridge;
+		_platform = platform;
 		CommandContextId = commandContextId;
 		Payload = payload;
 		CommandName = commandName;
@@ -20,20 +22,20 @@ public class CommandContext
 	
 	public CommandSource GetSource()
 	{
-		return new CommandSource(_bridge, CommandContextId, CommandName);
+		return new CommandSource(_bridge, CommandContextId, _platform, CommandName);
 	}
 	
-	public async Task SendFeedbackAsync(string message)
+	public async Task SendFeedback(string message)
 	{
 		if (Finalized)
 			throw new InvalidOperationException("Cannot send feedback after finalizing command.");
 
-		await _bridge.SendCommandFeedback(CommandContextId, message);
+		await _bridge.SendCommandFeedback(CommandContextId, _platform, message);
 	}
 
 	public async Task ExecuteMinecraftCommandAsync(string command)
 	{
-		await _bridge.ExecuteMinecraftCommandAsync(command);
+		await _bridge.ExecuteMinecraftCommandAsync(command, _platform);
 	}
 
 	public async Task FinalizeAsync()
@@ -42,6 +44,6 @@ public class CommandContext
 			return;
 		
 		Finalized = true;
-		await _bridge.FinalizeCommand(CommandContextId);
+		await _bridge.FinalizeCommand(CommandContextId, _platform);
 	}
 }

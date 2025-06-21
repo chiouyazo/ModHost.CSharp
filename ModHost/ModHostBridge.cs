@@ -28,34 +28,48 @@ public class ModHostBridge : IDisposable
 
     private async Task ListenForResponses()
     {
-        await _writer.WriteLineAsync($"{Guid.NewGuid().ToString()}:HELLO:{_modName}");
+        await _writer.WriteLineAsync($"{Guid.NewGuid().ToString()}:SERVER:SERVER:HELLO:{_modName}");
         
         while (true)
         {
-            string? line = await _reader.ReadLineAsync();
-            if (line == null) break;
-
-            string[] parts = line.Split(new[] { ':' }, 3);
-            if (parts.Length < 3) continue;
-
-            string id = parts[0];
-            string eventType = parts[1];
-            string payload = parts[2];
-
-            if (_pendingRequests.TryGetValue(id, out TaskCompletionSource<string>? tcs))
+            try
             {
-                tcs.SetResult(line);
-                _pendingRequests.Remove(id);
+                string? line = await _reader.ReadLineAsync();
+                if (line == null) break;
+
+                string[] parts = line.Split(new[] { ':' }, 5);
+                if (parts.Length < 5)
+                {
+                    Console.WriteLine($"Could not deserialize response {line}.");
+                    continue;
+                }
+
+                string id = parts[0];
+                string platform = parts[1];
+                string handler = parts[2];
+                string eventType = parts[3];
+                string payload = parts[4];
+
+                if (_pendingRequests.TryGetValue(id, out TaskCompletionSource<string>? tcs))
+                {
+                    tcs.SetResult(line);
+                    _pendingRequests.Remove(id);
+                }
+                else
+                {
+                    // handle unsolicited events here
+                    await Task.Run(() => HandleEvent(id, platform, handler, eventType, payload));
+                }
             }
-            else
+            catch (Exception ex)
             {
-                // handle unsolicited events here
-                await Task.Run(() => HandleEvent(id, eventType, payload));
+                Console.WriteLine("An error occured while reading data:");
+                Console.WriteLine(ex.ToString());
             }
         }
     }
 
-    private async Task HandleEvent(string id, string eventType, string payload)
+    private async Task HandleEvent(string id, string platform, string handler, string eventType, string payload)
     {
         if (eventType == "COMMAND_EXECUTED")
         {
@@ -71,7 +85,7 @@ public class ModHostBridge : IDisposable
             
             if (_commandCallbacks.TryGetValue(commandName, out Func<CommandContext, Task>? callback))
             {
-                CommandContext context = new CommandContext(this, id, commandName, commandPayload);
+                CommandContext context = new CommandContext(this, id, platform, commandName, commandPayload);
                 _ = callback(context);
             }
         }
@@ -84,7 +98,7 @@ public class ModHostBridge : IDisposable
             
             if (_commandCallbacks.TryGetValue(commandName, out Func<CommandContext, Task>? callback))
             {
-                CommandContext context = new CommandContext(this, id, commandName, commandPayload);
+                CommandContext context = new CommandContext(this, id, platform, commandName, commandPayload);
                 _ = callback(context);
             }
         }
@@ -97,12 +111,12 @@ public class ModHostBridge : IDisposable
 
             if (_requirementCallbacks.TryGetValue(commandName, out Func<CommandSource, Task<bool>>? callback))
             {
-                CommandSource ctx = new CommandSource(this, id, commandName);
+                CommandSource ctx = new CommandSource(this, id, platform, commandName);
                 
                 _ = Task.Run(async () =>
                 {
                     bool allowed = callback == null || await callback(ctx);
-                    await _writer.WriteLineAsync($"{id}:COMMAND_REQUIREMENT_RESPONSE:{allowed}");
+                    await _writer.WriteLineAsync($"{id}:{platform}:{handler}:COMMAND_REQUIREMENT_RESPONSE:{allowed}");
                 });
             }
         }
@@ -112,41 +126,41 @@ public class ModHostBridge : IDisposable
         }
     }
 
-    public async Task<string> SendRequestAsync(string id, string eventType, string payload = "")
+    public async Task<string> SendRequestAsync(string id, string platform, string handler, string eventType, string payload = "")
     {
         TaskCompletionSource<string> tcs = new TaskCompletionSource<string>();
         _pendingRequests[id] = tcs;
 
-        await _writer.WriteLineAsync($"{id}:{eventType}:{payload}");
+        await _writer.WriteLineAsync($"{id}:{platform}:{handler}:{eventType}:{payload}");
         await _writer.FlushAsync();
 
         return await tcs.Task;
     }
 	
-    public async Task ExecuteMinecraftCommandAsync(string rawCommand)
+    public async Task ExecuteMinecraftCommandAsync(string rawCommand, string platform)
     {
         string id = Guid.NewGuid().ToString();
         // Returns either COMMAND_RESULT:Success COMMAND_RESULT:Error:(error) or COMMAND_RESULT:Server not available but I dont think it matters here
-        await SendRequestAsync(id, "EXECUTE_COMMAND", rawCommand);
+        await SendRequestAsync(id, platform, "COMMAND", "EXECUTE_COMMAND", rawCommand);
     }
 
-    public async Task SendCommandFeedback(string commandId, string feedback)
+    public async Task SendCommandFeedback(string commandId, string platform, string feedback)
     {
         string id = Guid.NewGuid().ToString();
         // Returns "{id}:COMMAND_FEEDBACK:OK" but doesnt matter?
-        await SendRequestAsync(id, "COMMAND_FEEDBACK", $"{commandId}:{feedback}");
+        await SendRequestAsync(id, platform, "COMMAND", "COMMAND_FEEDBACK", $"{commandId}:{feedback}");
     }
 
-    public async Task FinalizeCommand(string commandId)
+    public async Task FinalizeCommand(string commandId, string platform)
     {
         string id = Guid.NewGuid().ToString();
         // Returns "{id}:COMMAND_FINALIZE:OK" but doesnt matter?
-        await SendRequestAsync(id, "COMMAND_FINALIZE", commandId);
+        await SendRequestAsync(id, platform, "COMMAND", "COMMAND_FINALIZE", commandId);
     }
     
-    public async Task RegisterCommandAsync(string commandName, Func<CommandContext, Task> onExecuted, Func<CommandSource, Task<bool>>? requirement = null)
+    public async Task RegisterCommandAsync(string commandName, string platform, Func<CommandContext, Task> onExecuted, Func<CommandSource, Task<bool>>? requirement = null)
     {
-        await RegisterManualCommandAsync(commandName, async context =>
+        await RegisterManualCommandAsync(commandName, platform, async context =>
         {
             await onExecuted(context);
             if (!context.Finalized)
@@ -154,9 +168,9 @@ public class ModHostBridge : IDisposable
         }, requirement);
     }
     
-    public async Task RegisterCommandAsync(string commandName, List<CommandArgument> arguments, Func<CommandContext, Task> onExecuted, Func<CommandSource, Task<bool>>? requirement = null)
+    public async Task RegisterCommandAsync(string commandName, string platform, List<CommandArgument> arguments, Func<CommandContext, Task> onExecuted, Func<CommandSource, Task<bool>>? requirement = null)
     {
-        await RegisterManualCommandAsync(commandName, arguments, async context =>
+        await RegisterManualCommandAsync(commandName, platform, arguments, async context =>
         {
             await onExecuted(context);
             if (!context.Finalized)
@@ -164,13 +178,13 @@ public class ModHostBridge : IDisposable
         }, requirement);
     }
 
-    public async Task RegisterManualCommandAsync(string commandName, Func<CommandContext, Task> onExecuted, Func<CommandSource, Task<bool>>? requirement = null)
+    public async Task RegisterManualCommandAsync(string commandName, string platform, Func<CommandContext, Task> onExecuted, Func<CommandSource, Task<bool>>? requirement = null)
     {
         string id = Guid.NewGuid().ToString();
         
-        string response = await SendRequestAsync(id, "REGISTER_COMMAND", commandName);
+        string response = await SendRequestAsync(id, platform, "COMMAND", "REGISTER_COMMAND", commandName);
         
-        if (response == $"{id}:COMMAND_REGISTERED:{commandName}")
+        if (response == $"{id}:{platform}:COMMAND:COMMAND_REGISTERED:{commandName}")
         {
             Console.WriteLine($"Registered command {commandName} successfully from C#.");
             _commandCallbacks.Add(commandName, onExecuted);
@@ -182,7 +196,7 @@ public class ModHostBridge : IDisposable
         }
     }
 
-    public async Task RegisterManualCommandAsync(string commandName, List<CommandArgument> arguments, Func<CommandContext, Task> onExecuted, Func<CommandSource, Task<bool>>? requirement = null)
+    public async Task RegisterManualCommandAsync(string commandName, string platform, List<CommandArgument> arguments, Func<CommandContext, Task> onExecuted, Func<CommandSource, Task<bool>>? requirement = null)
     {
         string id = Guid.NewGuid().ToString();
         
@@ -191,9 +205,9 @@ public class ModHostBridge : IDisposable
         
         string payload = $"{commandName}|{argsPayload}";
         
-        string response = await SendRequestAsync(id, "REGISTER_COMMAND", payload);
-        // 1ff44493-4788-47ac-a87f-bd0dac6fcbdf:COMMAND_REGISTERED:testTest|Tester:integer|required,SecondTester:integer|optional
-        if (response == $"{id}:COMMAND_REGISTERED:{payload}")
+        string response = await SendRequestAsync(id, platform, "COMMAND", "REGISTER_COMMAND", payload);
+        // 1ff44493-4788-47ac-a87f-bd0dac6fcbdf:PLATFORM:COMMAND_REGISTERED:testTest|Tester:integer|required,SecondTester:integer|optional
+        if (response == $"{id}:{platform}:COMMAND:COMMAND_REGISTERED:{payload}")
         {
             Console.WriteLine($"Registered command '{commandName}' with args successfully from C#.");
             _commandCallbacks.Add(commandName, onExecuted);

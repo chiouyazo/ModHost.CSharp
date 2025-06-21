@@ -1,28 +1,44 @@
-﻿namespace ModHost.Models;
+﻿using ModHost.Handlers;
+
+namespace ModHost.Models;
 
 public class CommandContext
 {
-	private readonly ModHostBridge _bridge;
+	private readonly CommandHandler _handler;
 	private readonly string _platform;
 
 	public bool Finalized { get; private set; }
 	public string CommandContextId { get; }
 	public string CommandName { get; }
-	public string Payload { get; }
+	public string RawPayload { get; }
+
+	public Dictionary<string, string> Payload { get; set; } = new Dictionary<string, string>();
 
 
-	public CommandContext(ModHostBridge bridge, string commandContextId, string platform, string commandName, string payload)
+	public CommandContext(CommandHandler handler, string commandContextId, string platform, string commandName, string rawPayload)
 	{
-		_bridge = bridge;
+		_handler = handler;
 		_platform = platform;
 		CommandContextId = commandContextId;
-		Payload = payload;
+		RawPayload = rawPayload;
 		CommandName = commandName;
+		
+		string[] arguments = rawPayload.Split("||");
+		if (!arguments.Any())
+			return;
+		
+		foreach (string argument in arguments)
+		{
+			if(!argument.Contains("="))
+				continue;
+			string[] strings = argument.Split("=", 2);
+			Payload.Add(strings[0], strings[1]);
+		}
 	}
 	
 	public CommandSource GetSource()
 	{
-		return new CommandSource(_bridge, CommandContextId, _platform, CommandName);
+		return new CommandSource(_handler, CommandContextId, _platform, CommandName);
 	}
 	
 	public async Task SendFeedback(string message)
@@ -30,12 +46,12 @@ public class CommandContext
 		if (Finalized)
 			throw new InvalidOperationException("Cannot send feedback after finalizing command.");
 
-		await _bridge.SendCommandFeedback(CommandContextId, _platform, message);
+		await _handler.SendCommandFeedback(CommandContextId, message);
 	}
 
 	public async Task ExecuteMinecraftCommandAsync(string command)
 	{
-		await _bridge.ExecuteMinecraftCommandAsync(command, _platform);
+		await _handler.ExecuteMinecraftCommandAsync(command);
 	}
 
 	public async Task FinalizeAsync()
@@ -44,6 +60,6 @@ public class CommandContext
 			return;
 		
 		Finalized = true;
-		await _bridge.FinalizeCommand(CommandContextId, _platform);
+		await _handler.FinalizeCommand(CommandContextId);
 	}
 }

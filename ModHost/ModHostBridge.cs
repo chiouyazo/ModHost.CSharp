@@ -98,9 +98,12 @@ public class ModHostBridge : IDisposable
             if (_requirementCallbacks.TryGetValue(commandName, out Func<CommandSource, Task<bool>>? callback))
             {
                 CommandSource ctx = new CommandSource(this, id, commandName);
-                bool allowed = callback == null || await callback(ctx);
-
-                await _writer.WriteLineAsync($"{id}:COMMAND_REQUIREMENT_RESPONSE:{allowed}");
+                
+                _ = Task.Run(async () =>
+                {
+                    bool allowed = callback == null || await callback(ctx);
+                    await _writer.WriteLineAsync($"{id}:COMMAND_REQUIREMENT_RESPONSE:{allowed}");
+                });
             }
         }
         else

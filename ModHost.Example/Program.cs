@@ -160,6 +160,15 @@ public class Program
 			.Requires(async context => await context.HasPermissionLevel(1));
 		
 		await commandHandler.RegisterCommandAsync(dayCommand);
+
+		CommandBuilder testerCommand = commandHandler.CreateCommand("tester")
+			.Executes(async context =>
+			{
+				float distanceTraveled = await context.GetSource().GetPlayer().DistanceTraveled();
+				await context.SendFeedback("Distance traveled: " + distanceTraveled);
+			});
+		
+		await commandHandler.RegisterCommandAsync(testerCommand);
 		
 		Console.WriteLine("ModHost ready and connected.");
 

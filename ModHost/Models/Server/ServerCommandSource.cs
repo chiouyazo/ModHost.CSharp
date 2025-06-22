@@ -8,9 +8,14 @@ public class ServerCommandSource : CommandSource
 	internal ServerCommandSource(CommandHandler handler, string contextId, string platform, string commandName, string context)
 	: base(handler, contextId, platform, commandName, context) { }
 
+
+	public ServerPlayerEntity GetPlayer()
+	{
+		return PlayerEntity.GetServerPlayer(Handler, ContextId, CommandName, Context);
+	}
+	
 	public async Task SendMessage(string message)
 	{
-		string id = Guid.NewGuid().ToString();
-		await _handler.Bridge.SendRequestAsync(id, _platform, "COMMAND", $"QUERY_{_context}_SOURCE", $"{ContextId}:{_commandName}:SEND_MESSAGE:{message}");
+		await SendRequest($"SEND_MESSAGE:{message}");
 	}
 }

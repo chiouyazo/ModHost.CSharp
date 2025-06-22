@@ -7,7 +7,7 @@ public class CommandHandler
 	private readonly string _platform = "SERVER";
 	
 	internal readonly ModHostBridge Bridge;
-	private readonly Dictionary<string, Func<CommandContext, Task>> _commandCallbacks = new Dictionary<string, Func<CommandContext, Task>>();
+	private readonly Dictionary<string, Func<CommandContext, Task>?> _commandCallbacks = new Dictionary<string, Func<CommandContext, Task>?>();
 	private readonly Dictionary<string, Func<CommandSource, Task<bool>>?> _requirementCallbacks = new Dictionary<string, Func<CommandSource, Task<bool>>?>();
 	
 	public CommandHandler(ModHostBridge bridge, bool isClient)
@@ -20,7 +20,7 @@ public class CommandHandler
     
 	public void HandleEvent(string id, string platform, string handler, string eventType, string payload)
 	{
-        string[] parts = payload.Split(':', 2);
+        string[] parts = payload.Split('|', 2);
         string commandName = parts[0];
         if (eventType == "COMMAND_EXECUTED")
         {
@@ -52,14 +52,23 @@ public class CommandHandler
             // Example payload: someCommand
             string sourcePayload = parts.Length > 1 ? parts[1] : "";
 
-            if (_requirementCallbacks.TryGetValue(commandName, out Func<CommandSource, Task<bool>>? callback))
+            string final = sourcePayload == "" ? commandName : $"{commandName}:{sourcePayload}"; 
+
+            if (_requirementCallbacks.TryGetValue(final, out Func<CommandSource, Task<bool>>? callback))
             {
-                CommandSource ctx = new CommandSource(this, id, platform, commandName);
+                CommandSource ctx = new CommandSource(this, id, platform, final);
                 
                 _ = Task.Run(async () =>
                 {
                     bool allowed = callback == null || await callback(ctx);
                     await Bridge.SendResponse(id, platform, handler, "COMMAND_REQUIREMENT_RESPONSE", allowed.ToString());
+                });
+            }
+            else 
+            {
+                _ = Task.Run(async () =>
+                {
+                    await Bridge.SendResponse(id, platform, handler, "COMMAND_REQUIREMENT_RESPONSE", false.ToString());
                 });
             }
         }
@@ -90,27 +99,27 @@ public class CommandHandler
         await Bridge.SendRequestAsync(id, _platform, "COMMAND", "COMMAND_FINALIZE", commandId);
     }
     
-    public async Task RegisterCommandAsync(string commandName, Func<CommandContext, Task> onExecuted, Func<CommandSource, Task<bool>>? requirement = null)
-    {
-        await RegisterManualCommandAsync(commandName, async context =>
-        {
-            await onExecuted(context);
-            if (!context.Finalized)
-                await context.FinalizeAsync();
-        }, requirement);
-    }
-    
-    public async Task RegisterCommandAsync(string commandName, List<CommandArgument> arguments, Func<CommandContext, Task> onExecuted, Func<CommandSource, Task<bool>>? requirement = null)
-    {
-        await RegisterManualCommandAsync(commandName, arguments, async context =>
-        {
-            await onExecuted(context);
-            if (!context.Finalized)
-                await context.FinalizeAsync();
-        }, requirement);
-    }
+    // public async Task RegisterCommandAsync(string commandName, Func<CommandContext, Task> onExecuted)
+    // {
+    //     await RegisterManualCommandAsync(commandName, async context =>
+    //     {
+    //         await onExecuted(context);
+    //         if (!context.Finalized)
+    //             await context.FinalizeAsync();
+    //     }, requirement);
+    // }
+    //
+    // public async Task RegisterCommandAsync(string commandName, List<CommandArgument> arguments, Func<CommandContext, Task> onExecuted)
+    // {
+    //     await RegisterManualCommandAsync(commandName, arguments, async context =>
+    //     {
+    //         await onExecuted(context);
+    //         if (!context.Finalized)
+    //             await context.FinalizeAsync();
+    //     }, requirement);
+    // }
 
-    public async Task RegisterManualCommandAsync(string commandName, Func<CommandContext, Task> onExecuted, Func<CommandSource, Task<bool>>? requirement = null)
+    private async Task RegisterManualCommandAsync(string commandName, Func<CommandContext, Task> onExecuted)
     {
         string id = Guid.NewGuid().ToString();
         
@@ -119,8 +128,6 @@ public class CommandHandler
         if (response == commandName)
         {
             Console.WriteLine($"Registered command {commandName} successfully from C#.");
-            _commandCallbacks.Add(commandName, onExecuted);
-            _requirementCallbacks.Add(commandName, requirement);
         }
         else
         {
@@ -128,7 +135,7 @@ public class CommandHandler
         }
     }
 
-    public async Task RegisterManualCommandAsync(string commandName, List<CommandArgument> arguments, Func<CommandContext, Task> onExecuted, Func<CommandSource, Task<bool>>? requirement = null)
+    private async Task RegisterManualCommandAsync(string commandName, List<CommandArgument> arguments, Func<CommandContext, Task> onExecuted)
     {
         string id = Guid.NewGuid().ToString();
         
@@ -142,12 +149,48 @@ public class CommandHandler
         if (response == payload)
         {
             Console.WriteLine($"Registered command '{commandName}' with args successfully from C#.");
-            _commandCallbacks.Add(commandName, onExecuted);
-            _requirementCallbacks.Add(commandName, requirement);
         }
         else
         {
             throw new Exception($"Command with args registration failed: {response}");
+        }
+    }
+    
+    public CommandBuilder CreateCommand(string rootName)
+    {
+        return new CommandBuilder(rootName);
+    }
+
+    public async Task RegisterCommandAsync(CommandBuilder commandBuilder)
+    {
+        string commandDefinition = commandBuilder.BuildCommandDefinition();
+        Console.WriteLine($"Registering command definition: {commandDefinition}");
+
+        _requirementCallbacks[commandBuilder.Name] = commandBuilder.RequirementCallback;
+        _commandCallbacks[commandBuilder.Name] = commandBuilder.ExecuteCallback;
+        RegisterCallbacks(commandBuilder.SubCommands, commandBuilder.Name);
+        
+        await RegisterManualCommandAsync(commandDefinition, async context =>
+        {
+            if (commandBuilder.ExecuteCallback != null)
+                await commandBuilder.ExecuteCallback(context);
+
+            if (!context.Finalized)
+                await context.FinalizeAsync();
+        });
+    }
+
+    private void RegisterCallbacks(IReadOnlyList<CommandBuilder> builders, string rootCommand)
+    {
+        foreach (CommandBuilder builder in builders)
+        {
+            string fullPath = $"{rootCommand}:{builder.Name}";
+            
+            _requirementCallbacks[fullPath] = builder.RequirementCallback;
+            _commandCallbacks[fullPath] = builder.ExecuteCallback;
+            
+            if(builder.SubCommands.Any())
+                RegisterCallbacks(builder.SubCommands, fullPath);
         }
     }
 }

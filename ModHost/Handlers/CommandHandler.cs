@@ -9,8 +9,7 @@ public class CommandHandler
 	internal readonly ModHostBridge Bridge;
 	private readonly Dictionary<string, Func<CommandContext, Task>?> _commandCallbacks = new Dictionary<string, Func<CommandContext, Task>?>();
 	private readonly Dictionary<string, Func<CommandSource, Task<bool>>?> _requirementCallbacks = new Dictionary<string, Func<CommandSource, Task<bool>>?>();
-    private readonly Dictionary<string, Func<string, Task<IEnumerable<string>>>> _suggestionCallbacks =
-        new Dictionary<string, Func<string, Task<IEnumerable<string>>>>();
+    private readonly Dictionary<string, Func<string, CommandSource, Task<IEnumerable<string>>>> _suggestionCallbacks = new Dictionary<string, Func<string, CommandSource, Task<IEnumerable<string>>>>();
     
 	public CommandHandler(ModHostBridge bridge, bool isClient)
 	{
@@ -58,7 +57,7 @@ public class CommandHandler
 
             if (_requirementCallbacks.TryGetValue(final, out Func<CommandSource, Task<bool>>? callback))
             {
-                CommandSource ctx = new CommandSource(this, id, platform, final);
+                CommandSource ctx = new CommandSource(this, id, platform, final, "COMMAND");
                 
                 _ = Task.Run(async () =>
                 {
@@ -77,7 +76,7 @@ public class CommandHandler
         else if (eventType == "SUGGESTION_REQUEST")
         {
             string requestId = id;
-            string[] suggestionParts = payload.Split(':', 2);
+            string[] suggestionParts = payload.Split(':', 3);
             if (suggestionParts.Length < 2)
             {
                 Console.WriteLine($"Invalid suggestion request payload: {payload}");
@@ -85,15 +84,16 @@ public class CommandHandler
             }
 
             string providerId = suggestionParts[0];
-            string query = suggestionParts[1];
+            string suggestionRequestId = suggestionParts[1];
+            string query = suggestionParts[2];
 
-            if (_suggestionCallbacks.TryGetValue(providerId, out Func<string, Task<IEnumerable<string>>>? callback))
+            if (_suggestionCallbacks.TryGetValue(providerId, out Func<string, CommandSource, Task<IEnumerable<string>>>? callback))
             {
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        IEnumerable<string> suggestions = await callback(query);
+                        IEnumerable<string> suggestions = await callback(query, new CommandSource(this, providerId, platform, suggestionRequestId, "SUGGESTION"));
                         string result = string.Join(",", suggestions);
                         await Bridge.SendResponse(requestId, platform, handler, "SUGGESTION_RESPONSE", result);
                     }
@@ -134,6 +134,12 @@ public class CommandHandler
     {
         string id = Guid.NewGuid().ToString();
         // Returns "{id}:COMMAND_FINALIZE:OK" but doesnt matter?
+        await Bridge.SendRequestAsync(id, _platform, "COMMAND", "COMMAND_FINALIZE", commandId);
+    }
+
+    public async Task FinalizeSuggestion(string commandId)
+    {
+        string id = Guid.NewGuid().ToString();
         await Bridge.SendRequestAsync(id, _platform, "COMMAND", "COMMAND_FINALIZE", commandId);
     }
     
@@ -218,7 +224,7 @@ public class CommandHandler
         });
     }
 
-    public void RegisterSuggestionProvider(string providerId, Func<string, Task<IEnumerable<string>>> suggestionCallback)
+    public void RegisterSuggestionProvider(string providerId, Func<string, CommandSource, Task<IEnumerable<string>>> suggestionCallback)
     {
         _suggestionCallbacks[providerId] = suggestionCallback;
     }

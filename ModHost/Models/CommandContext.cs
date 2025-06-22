@@ -38,7 +38,7 @@ public class CommandContext
 	
 	public CommandSource GetSource()
 	{
-		return new CommandSource(_handler, CommandContextId, _platform, CommandName);
+		return new CommandSource(_handler, CommandContextId, _platform, CommandName, "COMMAND");
 	}
 	
 	public async Task SendFeedback(string message)

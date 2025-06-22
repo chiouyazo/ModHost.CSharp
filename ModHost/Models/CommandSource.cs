@@ -5,22 +5,26 @@ namespace ModHost.Models;
 public class CommandSource
 {
 	private readonly CommandHandler _handler;
-	private readonly string _commandId;
 	private readonly string _platform;
 	private readonly string _commandName;
+	private readonly string _context;
+	
+	public string ContextId { get; private set; }
 
-	public CommandSource(CommandHandler handler, string commandId, string platform, string commandName)
+	// ContextId is either commandId or providerId
+	public CommandSource(CommandHandler handler, string contextId, string platform, string commandName, string context)
 	{
 		_handler = handler;
-		_commandId = commandId;
+		ContextId = contextId;
 		_platform = platform;
 		_commandName = commandName;
+		_context = context;
 	}
 
 	public async Task<bool> IsExecutedByPlayer()
 	{
 		string id = Guid.NewGuid().ToString();
-		string response = await _handler.Bridge.SendRequestAsync(id, _platform, "COMMAND", "QUERY_COMMAND_SOURCE", $"{_commandId}:{_commandName}:IS_PLAYER");
+		string response = await _handler.Bridge.SendRequestAsync(id, _platform, "COMMAND", $"QUERY_{_context}_SOURCE", $"{ContextId}:{_commandName}:IS_PLAYER");
 
 		// Response could be: [CommandContextId]:true
 		string[] parts = response.Split(':');
@@ -30,7 +34,7 @@ public class CommandSource
 	public async Task<string?> GetName()
 	{
 		string id = Guid.NewGuid().ToString();
-		string response = await _handler.Bridge.SendRequestAsync(id, _platform, "COMMAND", "QUERY_COMMAND_SOURCE", $"{_commandId}:{_commandName}:NAME");
+		string response = await _handler.Bridge.SendRequestAsync(id, _platform, "COMMAND", $"QUERY_{_context}_SOURCE", $"{ContextId}:{_commandName}:NAME");
         
 		string[] parts = response.Split(':', 2);
 		return parts.Length >= 2 ? parts[1] : null;
@@ -39,7 +43,7 @@ public class CommandSource
 	public async Task<bool> HasPermissionLevel(int level)
 	{
 		string id = Guid.NewGuid().ToString();
-		string response = await _handler.Bridge.SendRequestAsync(id, _platform, "COMMAND", "QUERY_COMMAND_SOURCE", $"{_commandId}:{_commandName}:HASPERMISSIONLEVEL:{level}");
+		string response = await _handler.Bridge.SendRequestAsync(id, _platform, "COMMAND", $"QUERY_{_context}_SOURCE", $"{ContextId}:{_commandName}:HASPERMISSIONLEVEL:{level}");
         
 		string[] parts = response.Split(':', 2);
 		

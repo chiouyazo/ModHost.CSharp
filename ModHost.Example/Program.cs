@@ -129,9 +129,13 @@ public class Program
 				await context.SendFeedback("Unavailable.");
 			}));
 
-		commandHandler.RegisterSuggestionProvider("screenList", async s =>
+		commandHandler.RegisterSuggestionProvider("screenList", async (completion, ctx) =>
 		{
-			return (await screenHandler.ListScreens()).ToList();
+			List<string> list = (await screenHandler.ListScreens()).ToList();
+			string? name = await ctx.GetName();
+			list.Add(name);
+			return list.Where(x => x.StartsWith(completion));
+			// await commandHandler.FinalizeSuggestion(ctx.ContextId); // TODO: This has to be done after the response was send
 		});
 
 		screenCommand.AddSubCommand(new CommandBuilder("list")

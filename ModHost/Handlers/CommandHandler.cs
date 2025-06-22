@@ -1,4 +1,5 @@
 ﻿using ModHost.Models;
+using ModHost.Models.Server;
 
 namespace ModHost.Handlers;
 
@@ -8,8 +9,8 @@ public class CommandHandler
 	
 	internal readonly ModHostBridge Bridge;
 	private readonly Dictionary<string, Func<CommandContext, Task>?> _commandCallbacks = new Dictionary<string, Func<CommandContext, Task>?>();
-	private readonly Dictionary<string, Func<CommandSource, Task<bool>>?> _requirementCallbacks = new Dictionary<string, Func<CommandSource, Task<bool>>?>();
-    private readonly Dictionary<string, Func<string, CommandSource, Task<IEnumerable<string>>>> _suggestionCallbacks = new Dictionary<string, Func<string, CommandSource, Task<IEnumerable<string>>>>();
+	private readonly Dictionary<string, Func<ServerCommandSource, Task<bool>>?> _requirementCallbacks = new Dictionary<string, Func<ServerCommandSource, Task<bool>>?>();
+    private readonly Dictionary<string, Func<string, ServerCommandSource, Task<IEnumerable<string>>>> _suggestionCallbacks = new Dictionary<string, Func<string, ServerCommandSource, Task<IEnumerable<string>>>>();
     
 	public CommandHandler(ModHostBridge bridge, bool isClient)
 	{
@@ -55,9 +56,9 @@ public class CommandHandler
 
             string final = sourcePayload == "" ? commandName : $"{commandName}:{sourcePayload}"; 
 
-            if (_requirementCallbacks.TryGetValue(final, out Func<CommandSource, Task<bool>>? callback))
+            if (_requirementCallbacks.TryGetValue(final, out Func<ServerCommandSource, Task<bool>>? callback))
             {
-                CommandSource ctx = new CommandSource(this, id, platform, final, "COMMAND");
+                ServerCommandSource ctx = new ServerCommandSource(this, id, platform, final, "COMMAND");
                 
                 _ = Task.Run(async () =>
                 {
@@ -87,13 +88,13 @@ public class CommandHandler
             string suggestionRequestId = suggestionParts[1];
             string query = suggestionParts[2];
 
-            if (_suggestionCallbacks.TryGetValue(providerId, out Func<string, CommandSource, Task<IEnumerable<string>>>? callback))
+            if (_suggestionCallbacks.TryGetValue(providerId, out Func<string, ServerCommandSource, Task<IEnumerable<string>>>? callback))
             {
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        IEnumerable<string> suggestions = await callback(query, new CommandSource(this, providerId, platform, suggestionRequestId, "SUGGESTION"));
+                        IEnumerable<string> suggestions = await callback(query, new ServerCommandSource(this, providerId, platform, suggestionRequestId, "SUGGESTION"));
                         string result = string.Join(",", suggestions);
                         await Bridge.SendResponse(requestId, platform, handler, "SUGGESTION_RESPONSE", result);
                     }
@@ -224,7 +225,7 @@ public class CommandHandler
         });
     }
 
-    public void RegisterSuggestionProvider(string providerId, Func<string, CommandSource, Task<IEnumerable<string>>> suggestionCallback)
+    public void RegisterSuggestionProvider(string providerId, Func<string, ServerCommandSource, Task<IEnumerable<string>>> suggestionCallback)
     {
         _suggestionCallbacks[providerId] = suggestionCallback;
     }

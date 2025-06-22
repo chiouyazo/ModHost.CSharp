@@ -1,4 +1,5 @@
 ﻿using ModHost.Handlers;
+using ModHost.Models.Server;
 
 namespace ModHost.Models;
 
@@ -36,9 +37,9 @@ public class CommandContext
 		}
 	}
 	
-	public CommandSource GetSource()
+	public ServerCommandSource GetSource()
 	{
-		return new CommandSource(_handler, CommandContextId, _platform, CommandName, "COMMAND");
+		return new ServerCommandSource(_handler, CommandContextId, _platform, CommandName, "COMMAND");
 	}
 	
 	public async Task SendFeedback(string message)

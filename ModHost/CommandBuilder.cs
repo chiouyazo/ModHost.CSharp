@@ -1,4 +1,5 @@
 ﻿using ModHost.Models;
+using ModHost.Models.Server;
 
 namespace ModHost;
 
@@ -8,7 +9,7 @@ public class CommandBuilder
     private readonly List<CommandArgument> _arguments = new List<CommandArgument>();
     private readonly List<CommandBuilder> _subCommands = new List<CommandBuilder>();
     private Func<CommandContext, Task>? _executeCallback;
-    private Func<CommandSource, Task<bool>>? _requirementCallback;
+    private Func<ServerCommandSource, Task<bool>>? _requirementCallback;
 
     public CommandBuilder(string name)
     {
@@ -53,7 +54,7 @@ public class CommandBuilder
         return this;
     }
 
-    public CommandBuilder Requires(Func<CommandSource, Task<bool>> requirementCallback)
+    public CommandBuilder Requires(Func<ServerCommandSource, Task<bool>> requirementCallback)
     {
         _requirementCallback = requirementCallback;
         return this;
@@ -63,7 +64,7 @@ public class CommandBuilder
     public IReadOnlyList<CommandArgument> Arguments => _arguments;
     public IReadOnlyList<CommandBuilder> SubCommands => _subCommands;
     public Func<CommandContext, Task>? ExecuteCallback => _executeCallback;
-    public Func<CommandSource, Task<bool>>? RequirementCallback => _requirementCallback;
+    public Func<ServerCommandSource, Task<bool>>? RequirementCallback => _requirementCallback;
 
     // Builds the command string, recursively including subcommands
     public string BuildCommandDefinition()

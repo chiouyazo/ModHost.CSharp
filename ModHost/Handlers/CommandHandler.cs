@@ -9,7 +9,9 @@ public class CommandHandler
 	internal readonly ModHostBridge Bridge;
 	private readonly Dictionary<string, Func<CommandContext, Task>?> _commandCallbacks = new Dictionary<string, Func<CommandContext, Task>?>();
 	private readonly Dictionary<string, Func<CommandSource, Task<bool>>?> _requirementCallbacks = new Dictionary<string, Func<CommandSource, Task<bool>>?>();
-	
+    private readonly Dictionary<string, Func<string, Task<IEnumerable<string>>>> _suggestionCallbacks =
+        new Dictionary<string, Func<string, Task<IEnumerable<string>>>>();
+    
 	public CommandHandler(ModHostBridge bridge, bool isClient)
 	{
 		if (isClient)
@@ -70,6 +72,42 @@ public class CommandHandler
                 {
                     await Bridge.SendResponse(id, platform, handler, "COMMAND_REQUIREMENT_RESPONSE", false.ToString());
                 });
+            }
+        }
+        else if (eventType == "SUGGESTION_REQUEST")
+        {
+            string requestId = id;
+            string[] suggestionParts = payload.Split(':', 2);
+            if (suggestionParts.Length < 2)
+            {
+                Console.WriteLine($"Invalid suggestion request payload: {payload}");
+                return;
+            }
+
+            string providerId = suggestionParts[0];
+            string query = suggestionParts[1];
+
+            if (_suggestionCallbacks.TryGetValue(providerId, out Func<string, Task<IEnumerable<string>>>? callback))
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        IEnumerable<string> suggestions = await callback(query);
+                        string result = string.Join(",", suggestions);
+                        await Bridge.SendResponse(requestId, platform, handler, "SUGGESTION_RESPONSE", result);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error handling suggestion for '{providerId}': {ex.Message}");
+                        await Bridge.SendResponse(requestId, platform, handler, "SUGGESTION_RESPONSE", "");
+                    }
+                });
+            }
+            else
+            {
+                Console.WriteLine($"No suggestion provider registered for '{providerId}'");
+                _ = Bridge.SendResponse(requestId, platform, handler, "SUGGESTION_RESPONSE", "");
             }
         }
         else
@@ -180,6 +218,11 @@ public class CommandHandler
         });
     }
 
+    public void RegisterSuggestionProvider(string providerId, Func<string, Task<IEnumerable<string>>> suggestionCallback)
+    {
+        _suggestionCallbacks[providerId] = suggestionCallback;
+    }
+    
     private void RegisterCallbacks(IReadOnlyList<CommandBuilder> builders, string rootCommand)
     {
         foreach (CommandBuilder builder in builders)

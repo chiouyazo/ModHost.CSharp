@@ -15,13 +15,14 @@ public class CommandBuilder
         _name = name;
     }
 
-    public CommandBuilder AddArgument(string name, string type, bool optional = false)
+    public CommandBuilder AddArgument(string name, string type, bool optional = false, string? suggestionProviderId = null)
     {
         _arguments.Add(new CommandArgument
         {
             Name = name,
             Type = type,
-            IsOptional = optional
+            IsOptional = optional,
+            SuggestionProviderId = suggestionProviderId
         });
         return this;
     }
@@ -68,7 +69,15 @@ public class CommandBuilder
     public string BuildCommandDefinition()
     {
         string argsPart = string.Join(",", _arguments.Select(arg =>
-            $"{arg.Name}:{arg.Type}|{(arg.IsOptional ? "optional" : "required")}"));
+        {
+            List<string> parts = new List<string> { arg.Name + ":" + arg.Type };
+            parts.Add(arg.IsOptional ? "optional" : "required");
+            
+            if (!string.IsNullOrEmpty(arg.SuggestionProviderId))
+                parts.Add($"suggestion={arg.SuggestionProviderId}");
+            
+            return string.Join("|", parts);
+        }));
 
         string subcommandsPart = "";
         if (_subCommands.Count > 0)

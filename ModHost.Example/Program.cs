@@ -123,10 +123,16 @@ public class Program
 				}));
 
 		screenCommand.AddSubCommand(new CommandBuilder("delete")
-				.Executes(async context =>
-				{
-					await context.SendFeedback("Unavailable.");
-				}));
+			.AddArgument("screen id", "string", false, "CUSTOM:screenList")
+			.Executes(async context =>
+			{
+				await context.SendFeedback("Unavailable.");
+			}));
+
+		commandHandler.RegisterSuggestionProvider("screenList", async s =>
+		{
+			return (await screenHandler.ListScreens()).ToList();
+		});
 
 		screenCommand.AddSubCommand(new CommandBuilder("list")
 				.Executes(async context =>

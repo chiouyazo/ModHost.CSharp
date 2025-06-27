@@ -28,6 +28,7 @@ public class ModHostBridge : IDisposable
         _blockHandler = new BlockHandler(this);
         
         _modName = modName;
+        Console.WriteLine("Trying to establish connection to mod host...");
         while (true)
         {
             try
@@ -37,10 +38,10 @@ public class ModHostBridge : IDisposable
             }
             catch (SocketException)
             {
-                Console.WriteLine("Connection refused. Retrying in .5 second...");
-                Thread.Sleep(500);
+                Thread.Sleep(250);
             }
         }
+        Console.WriteLine("Established connection to mod host successfully.");
         
         NetworkStream stream = _client.GetStream();
         _reader = new StreamReader(stream);

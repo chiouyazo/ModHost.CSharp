@@ -1,4 +1,5 @@
 ﻿using ModHost.Handlers;
+using ModHost.Models.Communication;
 using ModHost.Models.Server;
 
 namespace ModHost.Models;
@@ -16,11 +17,11 @@ public class CommandContext
 	public Dictionary<string, string> Payload { get; set; } = new Dictionary<string, string>();
 
 
-	public CommandContext(CommandHandler handler, string commandContextId, string platform, string commandName, string rawPayload)
+	public CommandContext(CommandHandler handler, MessageBase message, string commandName, string rawPayload)
 	{
 		_handler = handler;
-		_platform = platform;
-		CommandContextId = commandContextId;
+		_platform = message.Platform;
+		CommandContextId = message.Id;
 		RawPayload = rawPayload;
 		CommandName = commandName;
 		

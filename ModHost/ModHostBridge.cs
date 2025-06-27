@@ -1,6 +1,8 @@
 ﻿using System.Net.Sockets;
+using System.Text.Json;
 using ModHost.Handlers;
 using ModHost.Models;
+using ModHost.Models.Communication;
 
 namespace ModHost;
 
@@ -74,7 +76,7 @@ public class ModHostBridge : IDisposable
 
     private async Task ListenForResponses()
     {
-        await _writer.WriteLineAsync($"{Guid.NewGuid().ToString()}:SERVER:SERVER:HELLO:{_modName}");
+        // await _writer.WriteLineAsync($"{Guid.NewGuid().ToString()}:SERVER:SERVER:HELLO:{_modName}");
 
         int currEx = 0;
         int recurringEx = 0;
@@ -87,28 +89,28 @@ public class ModHostBridge : IDisposable
                 if (line == null) 
                     continue;
 
-                string[] parts = line.Split(new[] { ':' }, 5);
-                if (parts.Length < 5)
+                MessageBase? message;
+                try
                 {
-                    Console.WriteLine($"Could not deserialize response {line}.");
+                    message = JsonSerializer.Deserialize<MessageBase>(line);
+                }
+                catch (JsonException)
+                {
+                    Console.WriteLine($"Invalid JSON: {line}");
                     continue;
                 }
+                
+                if (message == null || string.IsNullOrWhiteSpace(message.Id)) 
+                    continue;
 
-                string id = parts[0];
-                string platform = parts[1];
-                string handler = parts[2];
-                string eventType = parts[3];
-                string payload = parts[4];
-
-                if (_pendingRequests.TryGetValue(id, out TaskCompletionSource<string>? tcs))
+                if (_pendingRequests.TryGetValue(message.Id, out TaskCompletionSource<string>? tcs))
                 {
-                    tcs.SetResult(payload);
-                    _pendingRequests.Remove(id);
+                    tcs.SetResult(message.GetPayload().Replace("\u0022", ""));
+                    _pendingRequests.Remove(message.Id);
                 }
                 else
                 {
-                    // handle unsolicited events here
-                    await Task.Run(() => HandleEvent(id, platform, handler, eventType, payload));
+                    await HandleEvent(message);
                 }
             }
             catch (Exception ex)
@@ -134,28 +136,36 @@ public class ModHostBridge : IDisposable
         }
     }
 
-    private async Task HandleEvent(string id, string platform, string handler, string eventType, string payload)
+    private async Task HandleEvent(MessageBase message)
     {
-        if (platform == "CLIENT")
+        if (message.Platform == "CLIENT")
         {
-            await _clientBridge.HandleEvent(id, platform, handler, eventType, payload);
+            await _clientBridge.HandleEvent(message);
             return;
         }
-        
-        if (handler == "COMMAND")
-            _commandHandler.HandleEvent(id, platform, handler, eventType, payload);
+
+        if (message.Handler == "COMMAND")
+            _commandHandler.HandleEvent(message);
         else
-        {
-            Console.WriteLine($"Unknown handler: {handler}:{eventType}");
-        }
+            Console.WriteLine($"Unknown handler: {message.Handler}:{message.Event}");
     }
 
-    public async Task<string> SendRequestAsync(string id, string platform, string handler, string eventType, string payload = "")
+    public async Task<string> SendRequestAsync(string id, string platform, string handler, string eventType, object payload)
     {
         TaskCompletionSource<string> tcs = new TaskCompletionSource<string>();
         _pendingRequests[id] = tcs;
+        
+        MessageBase message = new MessageBase()
+        {
+            Id = id,
+            Platform = platform,
+            Handler = handler,
+            Event = eventType,
+            Payload = payload
+        };
 
-        await _writer.WriteLineAsync($"{id}:{platform}:{handler}:{eventType}:{payload}");
+        string json = JsonSerializer.Serialize(message);
+        await _writer.WriteLineAsync(json);
         await _writer.FlushAsync();
 
         return await tcs.Task;
@@ -163,7 +173,18 @@ public class ModHostBridge : IDisposable
 
     public async Task SendResponse(string id, string platform, string handler, string eventType, string payload)
     {
-        await _writer.WriteLineAsync($"{id}:{platform}:{handler}:{eventType}:{payload}");
+        MessageBase message = new MessageBase()
+        {
+            Id = id,
+            Platform = platform,
+            Handler = handler,
+            Event = eventType,
+            Payload = payload
+        };
+        
+        string json = JsonSerializer.Serialize(message);
+        await _writer.WriteLineAsync(json);
+        await _writer.FlushAsync();
     }
 
     public void Dispose()

@@ -1,4 +1,5 @@
 ﻿using ModHost.Models;
+using ModHost.Models.Communication;
 using ModHost.Models.Server;
 
 namespace ModHost.Handlers;
@@ -20,11 +21,11 @@ public class CommandHandler
 		Bridge = bridge;
 	}
     
-	public void HandleEvent(string id, string platform, string handler, string eventType, string payload)
+	public void HandleEvent(MessageBase message)
 	{
-        string[] parts = payload.Split('|', 2);
+        string[] parts = message.GetPayload().Split('|', 2);
         string commandName = parts[0];
-        if (eventType == "COMMAND_EXECUTED")
+        if (message.Event == "COMMAND_EXECUTED")
         {
             // Example payload: "command_with_arg|arg1=123,arg2=hello"
             string commandPayload = parts.Length > 1 ? parts[1] : string.Empty;
@@ -35,21 +36,21 @@ public class CommandHandler
             
             if (_commandCallbacks.TryGetValue(commandName, out Func<CommandContext, Task>? callback))
             {
-                CommandContext context = new CommandContext(this, id, platform, commandName, commandPayload);
+                CommandContext context = new CommandContext(this, message, commandName, commandPayload);
                 _ = callback(context);
             }
         }
-        else if (eventType == "COMMAND_REGISTERED")
-        {
-            string commandPayload = parts.Length > 1 ? parts[1] : string.Empty;
-            
-            if (_commandCallbacks.TryGetValue(commandName, out Func<CommandContext, Task>? callback))
-            {
-                CommandContext context = new CommandContext(this, id, platform, commandName, commandPayload);
-                _ = callback(context);
-            }
-        }
-        else if (eventType == "COMMAND_REQUIREMENT")
+        // else if (message.Event == "COMMAND_REGISTERED")
+        // {
+        //     string commandPayload = parts.Length > 1 ? parts[1] : string.Empty;
+        //     
+        //     if (_commandCallbacks.TryGetValue(commandName, out Func<CommandContext, Task>? callback))
+        //     {
+        //         CommandContext context = new CommandContext(this, id, platform, commandName, commandPayload);
+        //         _ = callback(context);
+        //     }
+        // }
+        else if (message.Event == "COMMAND_REQUIREMENT")
         {
             // Example payload: someCommand
             string sourcePayload = parts.Length > 1 ? parts[1] : "";
@@ -58,29 +59,29 @@ public class CommandHandler
 
             if (_requirementCallbacks.TryGetValue(final, out Func<ServerCommandSource, Task<bool>>? callback))
             {
-                ServerCommandSource ctx = new ServerCommandSource(this, id, platform, final, "COMMAND");
+                ServerCommandSource ctx = new ServerCommandSource(this, message.Id, message.Platform, final, "COMMAND");
                 
                 _ = Task.Run(async () =>
                 {
                     bool allowed = callback == null || await callback(ctx);
-                    await Bridge.SendResponse(id, platform, handler, "COMMAND_REQUIREMENT_RESPONSE", allowed.ToString());
+                    await Bridge.SendResponse(message.Id, message.Platform, message.Handler, "COMMAND_REQUIREMENT_RESPONSE", allowed.ToString());
                 });
             }
             else 
             {
                 _ = Task.Run(async () =>
                 {
-                    await Bridge.SendResponse(id, platform, handler, "COMMAND_REQUIREMENT_RESPONSE", false.ToString());
+                    await Bridge.SendResponse(message.Id, message.Platform, message.Handler, "COMMAND_REQUIREMENT_RESPONSE", false.ToString());
                 });
             }
         }
-        else if (eventType == "SUGGESTION_REQUEST")
+        else if (message.Id == "SUGGESTION_REQUEST")
         {
-            string requestId = id;
-            string[] suggestionParts = payload.Split(':', 3);
+            string requestId = message.Id;
+            string[] suggestionParts = message.GetPayload().Split(':', 3);
             if (suggestionParts.Length < 2)
             {
-                Console.WriteLine($"Invalid suggestion request payload: {payload}");
+                Console.WriteLine($"Invalid suggestion request payload: {message.GetPayload()}");
                 return;
             }
 
@@ -94,26 +95,26 @@ public class CommandHandler
                 {
                     try
                     {
-                        IEnumerable<string> suggestions = await callback(query, new ServerCommandSource(this, providerId, platform, suggestionRequestId, "SUGGESTION"));
+                        IEnumerable<string> suggestions = await callback(query, new ServerCommandSource(this, message.Id, message.Platform, suggestionRequestId, "SUGGESTION"));
                         string result = string.Join(",", suggestions);
-                        await Bridge.SendResponse(requestId, platform, handler, "SUGGESTION_RESPONSE", result);
+                        await Bridge.SendResponse(requestId, message.Platform, message.Handler, "SUGGESTION_RESPONSE", result);
                     }
                     catch (Exception ex)
                     {
                         Console.WriteLine($"Error handling suggestion for '{providerId}': {ex.Message}");
-                        await Bridge.SendResponse(requestId, platform, handler, "SUGGESTION_RESPONSE", "");
+                        await Bridge.SendResponse(requestId, message.Platform, message.Handler, "SUGGESTION_RESPONSE", "");
                     }
                 });
             }
             else
             {
                 Console.WriteLine($"No suggestion provider registered for '{providerId}'");
-                _ = Bridge.SendResponse(requestId, platform, handler, "SUGGESTION_RESPONSE", "");
+                _ = Bridge.SendResponse(requestId, message.Platform, message.Handler, "SUGGESTION_RESPONSE", "");
             }
         }
         else
         {
-            Console.WriteLine($"Unhandled command event: {eventType} - {payload}");
+            Console.WriteLine($"Unhandled command event: {message.Event} - {message.GetPayload()}");
         }
 	}
     

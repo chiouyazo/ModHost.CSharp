@@ -1,4 +1,6 @@
-﻿namespace ModHost.Handlers;
+﻿using ModHost.Models.Communication;
+
+namespace ModHost.Handlers;
 
 public class ScreenHandler
 {
@@ -11,14 +13,14 @@ public class ScreenHandler
 		_bridge = bridge;
 	}
 
-	public void HandleEvent(string id, string platform, string handler, string eventType, string payload)
+	public void HandleEvent(MessageBase message)
 	{
-        Console.WriteLine($"Unhandled screen event: {eventType} - {payload}");
+        Console.WriteLine($"Unhandled screen event: {message.Event} - {message.GetPayload()}");
 	}
 
 	public async Task<string> CurrentScreen()
 	{
-		return await _bridge.SendRequestAsync(Guid.NewGuid().ToString(), _platform, Handler, "CURRENTSCREEN");
+		return await _bridge.SendRequestAsync(Guid.NewGuid().ToString(), _platform, Handler, "CURRENTSCREEN", "");
 	}
 
 	public async Task<Guid> ShowNewScreen(string screenText)
@@ -42,7 +44,7 @@ public class ScreenHandler
 
 	public async Task CloseScreen()
 	{
-		await _bridge.SendRequestAsync(Guid.NewGuid().ToString(), _platform, Handler, "CLOSESCREEN");
+		await _bridge.SendRequestAsync(Guid.NewGuid().ToString(), _platform, Handler, "CLOSESCREEN", "");
 	}
 
 	public async Task DeleteScreen(string commandId, string screenText)
@@ -52,7 +54,7 @@ public class ScreenHandler
 
 	public async Task<string[]> ListScreens()
 	{
-		string result = await _bridge.SendRequestAsync(Guid.NewGuid().ToString(), _platform, Handler, "LISTSCREENS");
+		string result = await _bridge.SendRequestAsync(Guid.NewGuid().ToString(), _platform, Handler, "LISTSCREENS", "");
 		string[] screens = result.Split("||");
 		return screens;
 	}

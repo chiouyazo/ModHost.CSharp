@@ -20,6 +20,21 @@ public class Program
 		}
 
 		ModHostBridge bridge = new ModHostBridge(port, "Csharp Example mod");
+		
+		// ItemHandler itemHandler = bridge.GetItemHandler();
+		// BlockHandler blockHandler = bridge.GetBlockHandler();
+		//
+		// bool susItemResult = await itemHandler.RegisterItem("suspicious_substance", "NATURAL");
+		//
+		// if (!susItemResult)
+		// 	Console.WriteLine("Failed to register suspicious substance.");
+		//
+		// bool meowBlockResult = await blockHandler.RegisterBlock("meow_block", "WOOD", true, "FUNCTIONAL");
+		//
+		// if (!meowBlockResult)
+		// 	Console.WriteLine("Failed to register meow block.");
+		//
+		
 		CommandHandler commandHandler = bridge.GetCommandHandler();
 
 		// await commandHandler.RegisterCommandAsync("csharp", async context =>
@@ -82,74 +97,74 @@ public class Program
 		
 		await clientComm.RegisterCommandAsync(meowCommand);
 		
-		ScreenHandler screenHandler = bridge.GetScreenHandler();
-		
-		CommandBuilder screenCommand = commandHandler.CreateCommand("screen");
-		
-		screenCommand.AddSubCommand(new CommandBuilder("current")
-				.Executes(async context => 
-				{
-					await context.SendFeedback($"Current screen: {await screenHandler.CurrentScreen()}");
-				}));
-
-		screenCommand.AddSubCommand(new CommandBuilder("new")
-				.AddArgument(new CommandArgument { Name = "Text", Type = "string", IsOptional = true })
-				.Executes(async context =>
-				{
-					string placeholderText = "meow";
-					if (context.Payload.TryGetValue("Text", out string? value))
-						placeholderText = value;
-
-					await context.SendFeedback($"Opening screen {await screenHandler.ShowNewScreen(placeholderText)}");
-				}));
-		
-		screenCommand.AddSubCommand(new CommandBuilder("push")
-				.Executes(async context =>
-				{
-					await context.SendFeedback("Unavailable.");
-				}));
-		
-		screenCommand.AddSubCommand(new CommandBuilder("showold")
-				.Executes(async context =>
-				{
-					await context.SendFeedback("Unavailable.");
-				}));
-
-		screenCommand.AddSubCommand(new CommandBuilder("close")
-				.Executes(async context =>
-				{
-					await screenHandler.CloseScreen();
-					await context.SendFeedback("Tried to close screen.");
-				}));
-
-		screenCommand.AddSubCommand(new CommandBuilder("delete")
-			.AddArgument("screen id", "string", false, "CUSTOM:screenList")
-			.Executes(async context =>
-			{
-				await context.SendFeedback("Unavailable.");
-			}));
-
-		commandHandler.RegisterSuggestionProvider("screenList", async (completion, ctx) =>
-		{
-			List<string> list = (await screenHandler.ListScreens()).ToList();
-			string? name = await ctx.GetName();
-			list.Add(name);
-			return list.Where(x => x.StartsWith(completion));
-			// await commandHandler.FinalizeSuggestion(ctx.ContextId); // TODO: This has to be done after the response was send
-		});
-
-		screenCommand.AddSubCommand(new CommandBuilder("list")
-				.Executes(async context =>
-				{
-					string[] screens = await screenHandler.ListScreens();
-					await context.SendFeedback("Screens:");
-					foreach (string screen in screens)
-					{
-						await context.SendFeedback($"- [{screen}]");
-					}
-				}));
-
-		await commandHandler.RegisterCommandAsync(screenCommand);
+		// ScreenHandler screenHandler = bridge.GetScreenHandler();
+		//
+		// CommandBuilder screenCommand = commandHandler.CreateCommand("screen");
+		//
+		// screenCommand.AddSubCommand(new CommandBuilder("current")
+		// 		.Executes(async context => 
+		// 		{
+		// 			await context.SendFeedback($"Current screen: {await screenHandler.CurrentScreen()}");
+		// 		}));
+		//
+		// screenCommand.AddSubCommand(new CommandBuilder("new")
+		// 		.AddArgument(new CommandArgument { Name = "Text", Type = "string", IsOptional = true })
+		// 		.Executes(async context =>
+		// 		{
+		// 			string placeholderText = "meow";
+		// 			if (context.Payload.TryGetValue("Text", out string? value))
+		// 				placeholderText = value;
+		//
+		// 			await context.SendFeedback($"Opening screen {await screenHandler.ShowNewScreen(placeholderText)}");
+		// 		}));
+		//
+		// screenCommand.AddSubCommand(new CommandBuilder("push")
+		// 		.Executes(async context =>
+		// 		{
+		// 			await context.SendFeedback("Unavailable.");
+		// 		}));
+		//
+		// screenCommand.AddSubCommand(new CommandBuilder("showold")
+		// 		.Executes(async context =>
+		// 		{
+		// 			await context.SendFeedback("Unavailable.");
+		// 		}));
+		//
+		// screenCommand.AddSubCommand(new CommandBuilder("close")
+		// 		.Executes(async context =>
+		// 		{
+		// 			await screenHandler.CloseScreen();
+		// 			await context.SendFeedback("Tried to close screen.");
+		// 		}));
+		//
+		// screenCommand.AddSubCommand(new CommandBuilder("delete")
+		// 	.AddArgument("screen id", "string", false, "CUSTOM:screenList")
+		// 	.Executes(async context =>
+		// 	{
+		// 		await context.SendFeedback("Unavailable.");
+		// 	}));
+		//
+		// commandHandler.RegisterSuggestionProvider("screenList", async (completion, ctx) =>
+		// {
+		// 	List<string> list = (await screenHandler.ListScreens()).ToList();
+		// 	string? name = await ctx.GetName();
+		// 	list.Add(name);
+		// 	return list.Where(x => x.StartsWith(completion));
+		// 	// await commandHandler.FinalizeSuggestion(ctx.ContextId); // TODO: This has to be done after the response was send
+		// });
+		//
+		// screenCommand.AddSubCommand(new CommandBuilder("list")
+		// 		.Executes(async context =>
+		// 		{
+		// 			string[] screens = await screenHandler.ListScreens();
+		// 			await context.SendFeedback("Screens:");
+		// 			foreach (string screen in screens)
+		// 			{
+		// 				await context.SendFeedback($"- [{screen}]");
+		// 			}
+		// 		}));
+		//
+		// await commandHandler.RegisterCommandAsync(screenCommand);
 
 		CommandBuilder dayCommand = commandHandler.CreateCommand("day")
 			.Executes(async context =>
@@ -160,15 +175,8 @@ public class Program
 			.Requires(async context => await context.HasPermissionLevel(1));
 		
 		await commandHandler.RegisterCommandAsync(dayCommand);
-
-		CommandBuilder testerCommand = commandHandler.CreateCommand("tester")
-			.Executes(async context =>
-			{
-				float distanceTraveled = await context.GetSource().GetPlayer().DistanceTraveled();
-				await context.SendFeedback("Distance traveled: " + distanceTraveled);
-			});
 		
-		await commandHandler.RegisterCommandAsync(testerCommand);
+		Console.WriteLine("Registered day command");
 		
 		Console.WriteLine("ModHost ready and connected.");
 

@@ -33,7 +33,7 @@ public class ClientBridge
 			_screenHandler.HandleEvent(id, platform, handler, eventType, payload);
 		else
 		{
-			Console.WriteLine($"Unknown handler: {handler}:{eventType}");
+			Console.WriteLine($"Unknown client handler: {handler}:{eventType}");
 		}
 	}
 }

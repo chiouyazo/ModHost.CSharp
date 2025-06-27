@@ -15,14 +15,30 @@ public class ModHostBridge : IDisposable
     private readonly ClientBridge _clientBridge;
     
     private readonly CommandHandler _commandHandler;
+    private readonly ItemHandler _itemHandler;
+    private readonly BlockHandler _blockHandler;
     
     public ModHostBridge(int port, string modName)
     {
         _clientBridge = new ClientBridge(this);
         _commandHandler = new CommandHandler(this, false);
+        _itemHandler = new ItemHandler(this);
+        _blockHandler = new BlockHandler(this);
         
         _modName = modName;
-        _client = new TcpClient("127.0.0.1", port);
+        while (true)
+        {
+            try
+            {
+                _client = new TcpClient("127.0.0.1", port);
+                break;
+            }
+            catch (SocketException)
+            {
+                Console.WriteLine("Connection refused. Retrying in .5 second...");
+                Thread.Sleep(500);
+            }
+        }
         
         NetworkStream stream = _client.GetStream();
         _reader = new StreamReader(stream);
@@ -46,16 +62,30 @@ public class ModHostBridge : IDisposable
         return _clientBridge.GetScreenHandler();
     }
 
+    public ItemHandler GetItemHandler()
+    {
+        return _itemHandler;
+    }
+
+    public BlockHandler GetBlockHandler()
+    {
+        return _blockHandler;
+    }
+
     private async Task ListenForResponses()
     {
         await _writer.WriteLineAsync($"{Guid.NewGuid().ToString()}:SERVER:SERVER:HELLO:{_modName}");
+
+        int currEx = 0;
+        int recurringEx = 0;
         
         while (true)
         {
             try
             {
                 string? line = await _reader.ReadLineAsync();
-                if (line == null) break;
+                if (line == null) 
+                    continue;
 
                 string[] parts = line.Split(new[] { ':' }, 5);
                 if (parts.Length < 5)
@@ -83,6 +113,21 @@ public class ModHostBridge : IDisposable
             }
             catch (Exception ex)
             {
+                if (currEx == ex.HResult)
+                {
+                    recurringEx++;
+                }
+                else
+                {
+                    currEx = ex.HResult;
+                    recurringEx = 0;
+                }
+
+                if (recurringEx > 2)
+                {
+                    Console.WriteLine("Exited listening loop because minecraft has probably exited.");
+                    break;
+                }
                 Console.WriteLine("An error occured while reading data:");
                 Console.WriteLine(ex.ToString());
             }

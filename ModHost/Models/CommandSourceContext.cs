@@ -1,4 +1,5 @@
-﻿using ModHost.Handlers;
+﻿using System.Text.Json;
+using ModHost.Handlers;
 
 namespace ModHost.Models;
 
@@ -47,6 +48,18 @@ public class CommandSourceContext
 		if (bool.TryParse(value, out bool result))
 			return result;
 		return false;
+	}
+
+	private protected List<string> SafeList(string value)
+	{
+		try
+		{
+			return JsonSerializer.Deserialize<List<string>>(value) ?? [];
+		}
+		catch
+		{
+			return [];
+		}
 	}
 
 	private protected async Task<string> SendRequest(string query)

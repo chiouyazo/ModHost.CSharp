@@ -36,6 +36,11 @@ public abstract class CommandSource : CommandSourceContext
 	{
 		return SafeBool(await SendRequest("ISSILENT"));
 	}
+	
+	public async Task<List<string>> GetPlayerNames()
+	{
+		return SafeList(await SendRequest("PLAYER_NAMES"));
+	}
 
 	public async Task SendError(string message)
 	{

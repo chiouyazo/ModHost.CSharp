@@ -106,7 +106,7 @@ public class ModHostBridge : IDisposable
 
                 if (_pendingRequests.TryGetValue(message.Id, out TaskCompletionSource<string>? tcs))
                 {
-                    tcs.SetResult(message.GetPayload().Replace("\u0022", ""));
+                    tcs.SetResult(message.GetPayload());
                     _pendingRequests.Remove(message.Id);
                 }
                 else

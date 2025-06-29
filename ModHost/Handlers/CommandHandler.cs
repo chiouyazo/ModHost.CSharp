@@ -75,7 +75,7 @@ public class CommandHandler
                 });
             }
         }
-        else if (message.Id == "SUGGESTION_REQUEST")
+        else if (message.Event == "SUGGESTION_REQUEST")
         {
             string requestId = message.Id;
             string[] suggestionParts = message.GetPayload().Split(':', 3);
@@ -98,6 +98,7 @@ public class CommandHandler
                         IEnumerable<string> suggestions = await callback(query, new ServerCommandSource(this, message.Id, message.Platform, suggestionRequestId, "SUGGESTION"));
                         string result = string.Join(",", suggestions);
                         await Bridge.SendResponse(requestId, message.Platform, message.Handler, "SUGGESTION_RESPONSE", result);
+                        await FinalizeSuggestion(suggestionRequestId);
                     }
                     catch (Exception ex)
                     {

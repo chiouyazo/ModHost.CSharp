@@ -10,6 +10,6 @@ public class MessageBase
 
 	public string GetPayload()
 	{
-		return Payload.ToString().Replace("\"", "");
+		return Payload.ToString().TrimStart('"').TrimEnd('"');
 	}
 }

@@ -1,5 +1,6 @@
 ﻿namespace ModHost.Models.Communication.Items;
 
+// TODO: Add base class for itemregistration so that we dont parse an actual object in its ctor
 public class ArmorPayload
 {
 	public int Durability { get; set; }

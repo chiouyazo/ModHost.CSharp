@@ -33,7 +33,12 @@ public class Program
 		DefenseMap defenseMap = new DefenseMap(1, 1, 1, 1, 1);
 		ArmorPayload armorPayload = new ArmorPayload(2, defenseMap, 2, "block.anvil.destroy", 0.0f, 0.0f, "repairs_leather_armor",
 			"suspicious_helmet");
-		bool armorResult = await itemHandler.RegisterArmor("suspicious_helmet", "natural_blocks", armorPayload);
+
+		ItemRegistration itemRegistration =
+			new ItemRegistration("suspicious_helmet", ItemType.Armor, armorPayload, "natural_blocks");
+		itemRegistration.SetFood(new FoodPayload(3, 3, true));
+		
+		bool armorResult = await itemHandler.RegisterItem(itemRegistration);
 			
 		if(armorResult)
 			Console.WriteLine("Armor has been registered successfully");

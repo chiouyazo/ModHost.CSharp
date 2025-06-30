@@ -14,11 +14,9 @@ public class ItemHandler
 		_bridge = bridge;
 	}
 
-	public async Task<bool> RegisterArmor(string itemDefinition, String itemGroup, ArmorPayload armorSettings)
+	public async Task<bool> RegisterItem(ItemRegistration item)
 	{
-		ItemRegistration registration = new ItemRegistration(itemDefinition, ItemType.Armor, armorSettings, itemGroup);
-
-		return SafeBool(await _bridge.SendRequestAsync(Guid.NewGuid().ToString(), _platform, Handler, "REGISTER_ITEM", registration));
+		return SafeBool(await _bridge.SendRequestAsync(Guid.NewGuid().ToString(), _platform, Handler, "REGISTER_ITEM", item));
 	}
 
 	private protected bool SafeBool(string value)

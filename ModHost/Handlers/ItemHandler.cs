@@ -1,4 +1,7 @@
-﻿namespace ModHost.Handlers;
+﻿using System.Text.Json;
+using ModHost.Models.Communication.Items;
+
+namespace ModHost.Handlers;
 
 public class ItemHandler
 {
@@ -11,9 +14,11 @@ public class ItemHandler
 		_bridge = bridge;
 	}
 
-	public async Task<bool> RegisterItem(string itemDefinition, string itemGroup)
+	public async Task<bool> RegisterArmor(string itemDefinition, String itemGroup, ArmorPayload armorSettings)
 	{
-		return SafeBool(await _bridge.SendRequestAsync(Guid.NewGuid().ToString(), _platform, Handler, "REGISTER_ITEM", $"{itemDefinition}|{itemGroup}"));
+		ItemRegistration registration = new ItemRegistration(itemDefinition, ItemType.Armor, armorSettings, itemGroup);
+
+		return SafeBool(await _bridge.SendRequestAsync(Guid.NewGuid().ToString(), _platform, Handler, "REGISTER_ITEM", registration));
 	}
 
 	private protected bool SafeBool(string value)

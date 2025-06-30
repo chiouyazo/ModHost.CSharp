@@ -1,5 +1,6 @@
 ﻿using ModHost.Handlers;
 using ModHost.Models;
+using ModHost.Models.Communication.Items;
 
 namespace ModHost.Example;
 
@@ -24,12 +25,22 @@ public class Program
 		ItemHandler itemHandler = bridge.GetItemHandler();
 		BlockHandler blockHandler = bridge.GetBlockHandler();
 		
-		bool susItemResult = await itemHandler.RegisterItem("suspicious_substance", "NATURAL");
+		// bool susItemResult = await itemHandler.RegisterItem("suspicious_substance", "NATURAL");
 		
-		if (!susItemResult)
-			Console.WriteLine("Failed to register suspicious substance.");
+		// if (!susItemResult)
+			// Console.WriteLine("Failed to register suspicious substance.");
+
+		DefenseMap defenseMap = new DefenseMap(1, 1, 1, 1, 1);
+		ArmorPayload armorPayload = new ArmorPayload(2, defenseMap, 2, "block.anvil.destroy", 0.0f, 0.0f, "repairs_leather_armor",
+			"suspicious_helmet");
+		bool armorResult = await itemHandler.RegisterArmor("suspicious_helmet", "natural_blocks", armorPayload);
+			
+		if(armorResult)
+			Console.WriteLine("Armor has been registered successfully");
+		else
+			Console.WriteLine("Could not register armor");
 		
-		bool meowBlockResult = await blockHandler.RegisterBlock("meow_block", "SAND", true, "FUNCTIONAL");
+		bool meowBlockResult = await blockHandler.RegisterBlock("meow_block", "SAND", true, "functional_blocks");
 		
 		if (!meowBlockResult)
 			Console.WriteLine("Failed to register meow block.");

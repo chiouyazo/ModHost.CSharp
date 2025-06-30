@@ -17,4 +17,19 @@
       </None>
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="modHostExample_assets\assets\.minecraft\blocks\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Include="modHostExample_assets\assets\.minecraft\blockstates\meow_block.json" />
+      <Content Include="modHostExample_assets\assets\.minecraft\items\meow_block.json" />
+      <Content Include="modHostExample_assets\assets\.minecraft\items\suspicious_substance.json" />
+      <Content Include="modHostExample_assets\assets\.minecraft\lang\en_us.json" />
+      <Content Include="modHostExample_assets\assets\.minecraft\models\block\meow_block.json" />
+      <Content Include="modHostExample_assets\assets\.minecraft\models\item\suspicious_substance.json" />
+      <Content Include="modHostExample_assets\assets\.minecraft\textures\block\meow_block.png" />
+      <Content Include="modHostExample_assets\assets\.minecraft\textures\item\suspicious_substance.png" />
+    </ItemGroup>
+
 </Project>

@@ -27,8 +27,10 @@
       <Content Include="modHostExample_assets\assets\.minecraft\items\suspicious_substance.json" />
       <Content Include="modHostExample_assets\assets\.minecraft\lang\en_us.json" />
       <Content Include="modHostExample_assets\assets\.minecraft\models\block\meow_block.json" />
+      <Content Include="modHostExample_assets\assets\.minecraft\models\item\suspicious_helmet.json" />
       <Content Include="modHostExample_assets\assets\.minecraft\models\item\suspicious_substance.json" />
       <Content Include="modHostExample_assets\assets\.minecraft\textures\block\meow_block.png" />
+      <Content Include="modHostExample_assets\assets\.minecraft\textures\item\suspicious_helmet.png" />
       <Content Include="modHostExample_assets\assets\.minecraft\textures\item\suspicious_substance.png" />
     </ItemGroup>
 

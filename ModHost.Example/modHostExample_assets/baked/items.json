@@ -1,0 +1,40 @@
+[
+    {
+        "ItemDefinition": "suspicious_helmet",
+        "ItemType": 0,
+        "ItemPayload": {
+            "Durability": 2,
+            "Defense": {
+                "BootsDefense": 1,
+                "LeggingsDefense": 1,
+                "ChestplateDefense": 1,
+                "HelmetDefense": 1,
+                "BodyDefense": 1
+            },
+            "EnchantmentValue": 2,
+            "EquipSound": "block.anvil.destroy",
+            "Toughness": 0.0,
+            "KnockbackResistance": 0.0,
+            "RepairIngredient": "repairs_leather_armor",
+            "AssetId": "suspicious_helmet"
+        },
+        "ItemGroup": "natural_blocks",
+
+        "MaxCount": null,
+        "MaxDamage": null,
+
+        "JukeboxSong": null,
+        "Repairable": null,
+
+        "Enchantable": false,
+        "Fireproof": true,
+        "Rarity": 3,
+        "EquipableSlot": 2,
+        "EquipableUnswappable": null,
+        "Food": {
+            "Nutrition": 2,
+            "Saturation": 2,
+            "CanAlwaysEat": true
+        }
+    }
+]
